@@ -1,0 +1,30 @@
+name: "Imed Cortex Action"
+description: "Uploads security scan reports to Imed Cortex platform"
+branding:
+  icon: "upload"
+  color: "blue"
+
+inputs:
+  endpoint_url:
+    description: "Full endpoint URL for Imed Cortex"
+    required: true
+  api_key:
+    description: "API key for authentication"
+    required: true
+  report_path:
+    description: "Path to the security scan report file"
+    required: true
+
+outputs:
+  success:
+    description: "Indicates if report upload was successful"
+  message:
+    description: "Detailed message about the upload result"
+
+runs:
+  using: docker
+  image: Dockerfile
+  env:
+    REPORT_PATH: ${{ inputs.report_path }}
+    API_KEY: ${{ inputs.api_key }}
+    ENDPOINT_URL: ${{ inputs.endpoint_url }}

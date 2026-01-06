@@ -1,0 +1,47 @@
+name: Auto-Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      - name: Get latest version
+        id: get_version
+        run: |
+          # Get the latest tag if it exists
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1")
+          echo "Latest tag: $LATEST_TAG"
+          # Remove the 'v' prefix to work with semver
+          LATEST_VERSION=${LATEST_TAG#v}
+          # Split into parts
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
+          # Increment patch version
+          PATCH=$((PATCH + 1))
+          # Create new version
+          NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version will be: $NEW_VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.NEW_VERSION }}
+          name: Release ${{ steps.get_version.outputs.NEW_VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          token: ${{ secrets.SUPER_SECRET_TOKEN }}
