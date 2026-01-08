@@ -4,6 +4,12 @@ branding:
   icon: "upload"
   color: "blue"
 
+# IMPORTANT: Before using this action, ensure:
+# 1. The cortex-uploader image is pushed to ghcr.io/cguajardo-imed/cortex-uploader:latest
+# 2. The package visibility is set to public OR
+# 3. The package has been granted access to repositories that will use this action
+# 4. If using private packages across orgs, use a PAT with read:packages scope instead of github.token
+
 inputs:
   endpoint_url:
     description: "Full endpoint URL for Imed Cortex"
@@ -15,7 +21,9 @@ inputs:
     description: "Path to the security scan report file"
     required: true
   github_token:
-    description: "GitHub token for authenticating with GHCR (uses automatic github.token for same-organization access)"
+    description: |
+      GitHub token for authenticating with GHCR.
+      - The token must have permission to pull from ghcr.io/cguajardo-imed/cortex-uploader
     required: false
     default: ${{ github.token }}
   registry_username:
@@ -45,7 +53,14 @@ runs:
       shell: bash
       run: |
         echo "🐳 Pulling cortex-uploader image..."
-        docker pull ghcr.io/cguajardo-imed/cortex-uploader:latest
+        if ! docker pull ghcr.io/cguajardo-imed/cortex-uploader:latest; then
+          echo "❌ Failed to pull image. Common causes:"
+          echo "   - Image doesn't exist at ghcr.io/cguajardo-imed/cortex-uploader:latest"
+          echo "   - Image is private and token lacks read:packages permission"
+          echo "   - Package hasn't been granted access to this repository"
+          exit 1
+        fi
+        echo "✅ Image pulled successfully"
 
     - name: Upload Report to Cortex
       id: upload
