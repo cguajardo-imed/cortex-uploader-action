@@ -148,22 +148,6 @@ jobs:
 
             ---
 
-      - name: Update 'latest' tag
-        if: steps.check_skip.outputs.skip != 'true' && steps.check_changes.outputs.changes == 'true' && github.event.inputs.prerelease != 'true'
-        run: |
-          echo "🏷️ Updating 'latest' tag to point to ${{ steps.get_version.outputs.NEW_VERSION }}"
-
-          # Delete the 'latest' tag locally if it exists
-          git tag -d latest 2>/dev/null || true
-
-          # Create new 'latest' tag pointing to current commit
-          git tag latest
-
-          # Force push the 'latest' tag to remote
-          git push origin latest --force
-
-          echo "✅ 'latest' tag updated successfully"
-
       - name: Release Summary
         if: steps.check_skip.outputs.skip != 'true' && steps.check_changes.outputs.changes == 'true'
         run: |
@@ -174,11 +158,6 @@ jobs:
           echo "**Pre-release:** ${{ github.event.inputs.prerelease }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View the release: [${{ steps.get_version.outputs.NEW_VERSION }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.NEW_VERSION }})" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ github.event.inputs.prerelease }}" != "true" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**'latest' tag:** Updated to point to this release" >> $GITHUB_STEP_SUMMARY
-          fi
 
       - name: Skip Summary
         if: steps.check_skip.outputs.skip == 'true'
