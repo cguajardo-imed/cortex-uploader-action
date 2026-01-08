@@ -57,8 +57,11 @@ jobs:
         if: steps.check_skip.outputs.skip != 'true'
         id: get_version
         run: |
-          # Get the latest tag, default to v0.0.0 if none exist
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Get the latest semver tag (exclude 'latest' and non-semver tags)
+          LATEST_TAG=$(git tag -l 'v*.*.*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
           echo "📌 Latest tag: $LATEST_TAG"
 
           # Remove the 'v' prefix to work with semver
