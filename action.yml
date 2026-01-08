@@ -40,7 +40,6 @@ runs:
         registry: ghcr.io
         username: ${{ inputs.registry_username }}
         password: ${{ inputs.github_token }}
-      shell: bash
 
     - name: Pull Cortex Uploader Image
       shell: bash
