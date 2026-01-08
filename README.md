@@ -30,6 +30,9 @@ on:
 jobs:
   scan-and-upload:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read  # Required to pull private images from GHCR
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -72,6 +75,9 @@ on:
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
       
@@ -90,6 +96,9 @@ jobs:
 
   gitleaks-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -147,13 +156,28 @@ jobs:
 
 ## Setup
 
-### 1. Get Your API Key
+### 1. Ensure Workflow Permissions
+
+Since this action uses a private Docker image from GitHub Container Registry, your workflow needs the `packages: read` permission. Add this to your workflow:
+
+```yaml
+jobs:
+  your-job:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read  # Required for private GHCR images
+```
+
+**Note:** This action automatically uses the workflow's built-in `github.token` for authentication, so no additional secrets are needed for image access within the same organization.
+
+### 2. Get Your Cortex API Key
 
 Contact your Imed Cortex administrator to obtain an API key for your organization.
 
-### 2. Configure Secrets
+### 3. Add Your Cortex API Key to Secrets
 
-Add your API key as a secret in your GitHub repository:
+Add your Cortex API key as a secret in your GitHub repository:
 
 1. Go to your repository **Settings** → **Secrets and variables** → **Actions**
 2. Click **New repository secret**
@@ -161,7 +185,7 @@ Add your API key as a secret in your GitHub repository:
 4. Value: Your API key
 5. Click **Add secret**
 
-### 3. Configure Variables (Optional)
+### 4. Configure Endpoint URL (Optional)
 
 For the endpoint URL, you can use repository variables:
 
@@ -182,14 +206,24 @@ This action accepts reports from various security scanning tools. Common example
 
 ## Troubleshooting
 
-### Upload Failed: Authentication Error
+### Upload Failed: Authentication Error (Cortex API)
 
-**Problem:** Getting 401 or 403 errors
+**Problem:** Getting 401 or 403 errors from Cortex API
 
 **Solution:**
-- Verify your API key is correct
+- Verify your Cortex API key is correct
 - Check that the secret name matches in your workflow
 - Ensure your API key hasn't expired
+
+### Upload Failed: Docker Image Pull Error
+
+**Problem:** Cannot pull Docker image from GHCR
+
+**Solution:**
+- Ensure your workflow has `packages: read` permission
+- Verify your repository is in the same organization as the image
+- Check that the `github.token` has not been restricted
+- Confirm the image name is correct: `ghcr.io/cguajardo-imed/cortex-uploader:latest`
 
 ### Upload Failed: Connection Error
 
@@ -231,6 +265,9 @@ on:
 jobs:
   security-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -260,6 +297,9 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     strategy:
       matrix:
         scanner:
@@ -289,6 +329,8 @@ jobs:
 ## Security Considerations
 
 - **API Key Storage**: Always store API keys in GitHub Secrets, never in code
+- **Workflow Permissions**: Only grant `packages: read` permission (minimum required)
+- **Same Organization**: This action works best when used within the same GitHub organization as the image
 - **Endpoint URL**: Can be stored in Variables for easier management
 - **Report Contents**: Ensure reports don't contain sensitive information
 - **Access Control**: Limit who can view workflow runs that contain security data
