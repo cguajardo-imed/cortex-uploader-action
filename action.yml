@@ -23,7 +23,7 @@ outputs:
 
 runs:
   using: docker
-  image: Dockerfile
+  image: "docker://ghcr.io/cguajardo-imed/cortex-uploader:latest"
   env:
     REPORT_PATH: ${{ inputs.report_path }}
     API_KEY: ${{ inputs.api_key }}

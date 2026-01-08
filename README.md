@@ -1,21 +1,25 @@
-# Imed Cortex Report Uploader Action
+# Imed Cortex Action
 
-This GitHub Action automates the process of uploading security scan reports to the Imed Cortex platform. It supports various security scanning tools including Trivy, Gitleaks, and other SARIF-compatible scanners. This action is designed to be used in CI/CD pipelines to ensure that scan reports are consistently uploaded after security scans are executed.
+A GitHub Action that uploads security scan reports to the Imed Cortex platform. This action provides a simple interface for integrating security scanning into your CI/CD pipeline.
+
+## Overview
+
+This action is designed to work with various security scanning tools (Trivy, Gitleaks, etc.) and automatically uploads their reports to the Imed Cortex platform for centralized security analysis and reporting.
 
 ## Features
 
 - 🔒 Secure API key-based authentication
 - 📤 Automatic report upload to Imed Cortex
-- ✅ Validation of report files and environment variables
-- 🔍 Detailed error reporting and logging
-- 🐳 Lightweight Docker-based implementation
+- ✅ Built-in validation of inputs
+- 🔍 Detailed error reporting
+- 🐳 Docker-based implementation for consistency
 
 ## Usage
 
 ### Basic Example
 
 ```yaml
-name: Security Scan and Upload
+name: Security Scan
 
 on:
   push:
@@ -24,265 +28,284 @@ on:
     branches: [ main ]
 
 jobs:
-  security-scan:
+  scan-and-upload:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Run security scan
-        # Run your preferred security scanner here
-        # Example with Trivy:
+      - name: Run Trivy security scan
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace aquasec/trivy:latest \
-            fs --format json --output /workspace/scan-results.json /workspace
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            aquasec/trivy:latest \
+            fs --format json --output /workspace/trivy-report.json /workspace
 
       - name: Upload to Imed Cortex
-        uses: your-org/cortex-action@v1
+        uses: cguajardo-imed/cortex-action@v1
         with:
-          endpoint_url: 'https://cortex.example.com/api/upload/sarif'
+          endpoint_url: https://cortex.example.com/api/reports/upload
           api_key: ${{ secrets.CORTEX_API_KEY }}
-          report_path: './scan-results.json'
+          report_path: trivy-report.json
 ```
 
-### Advanced Example with Multiple Scans
+### Using GitHub Variables
 
 ```yaml
+      - name: Upload to Imed Cortex
+        uses: cguajardo-imed/cortex-action@v1
+        with:
+          endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
+          api_key: ${{ secrets.CORTEX_API_KEY }}
+          report_path: scan-results.json
+```
+
+### Multiple Scanners Example
+
+```yaml
+name: Security Scans
+
+on:
+  push:
+    branches: [ main ]
+
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - name: Run Trivy scan
+      - name: Run Trivy
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace aquasec/trivy:latest \
-            fs --format json --output /workspace/trivy-results.json /workspace
+          docker run --rm -v ${{ github.workspace }}:/workspace \
+            aquasec/trivy:latest fs --format json \
+            --output /workspace/trivy-results.json /workspace
       
-      - name: Upload Trivy results
-        uses: your-org/cortex-action@v1
+      - name: Upload Trivy Report
+        uses: cguajardo-imed/cortex-action@v1
         with:
           endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
           api_key: ${{ secrets.CORTEX_API_KEY }}
-          report_path: './trivy-results.json'
+          report_path: trivy-results.json
 
   gitleaks-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
-      - name: Run Gitleaks scan
+      - name: Run Gitleaks
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace \
             zricethezav/gitleaks:latest detect \
-            --source /workspace --report-path /workspace/gitleaks-results.json
+            --source /workspace --report-path /workspace/gitleaks-report.json \
+            --report-format json || true
       
-      - name: Upload Gitleaks results
-        uses: your-org/cortex-action@v1
+      - name: Upload Gitleaks Report
+        uses: cguajardo-imed/cortex-action@v1
         with:
           endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
           api_key: ${{ secrets.CORTEX_API_KEY }}
-          report_path: './gitleaks-results.json'
+          report_path: gitleaks-report.json
+```
+
+### With Error Handling
+
+```yaml
+      - name: Upload to Imed Cortex
+        id: cortex-upload
+        uses: cguajardo-imed/cortex-action@v1
+        with:
+          endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
+          api_key: ${{ secrets.CORTEX_API_KEY }}
+          report_path: scan-results.json
+
+      - name: Check Upload Status
+        if: steps.cortex-upload.outputs.success == 'false'
+        run: |
+          echo "Upload failed: ${{ steps.cortex-upload.outputs.message }}"
+          exit 1
 ```
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `endpoint_url` | Full endpoint URL for Imed Cortex platform | Yes | - |
-| `api_key` | API key for authentication with Imed Cortex | Yes | - |
-| `report_path` | Path to the security scan report file (JSON format) | Yes | - |
+### Required Inputs
+
+| Input | Description | Required |
+|-------|-------------|----------|
+| `endpoint_url` | Full endpoint URL for Imed Cortex | Yes |
+| `api_key` | API key for authentication | Yes |
+| `report_path` | Path to the security scan report file | Yes |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `success` | Boolean indicating if the report upload was successful |
+| `success` | Indicates if report upload was successful (true/false) |
 | `message` | Detailed message about the upload result |
-| `status_code` | HTTP status code from the upload request |
 
-## Example with Output Handling
+## Setup
+
+### 1. Get Your API Key
+
+Contact your Imed Cortex administrator to obtain an API key for your organization.
+
+### 2. Configure Secrets
+
+Add your API key as a secret in your GitHub repository:
+
+1. Go to your repository **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `CORTEX_API_KEY`
+4. Value: Your API key
+5. Click **Add secret**
+
+### 3. Configure Variables (Optional)
+
+For the endpoint URL, you can use repository variables:
+
+1. Go to your repository **Settings** → **Secrets and variables** → **Actions** → **Variables** tab
+2. Click **New repository variable**
+3. Name: `CORTEX_ENDPOINT_URL`
+4. Value: Your Cortex endpoint URL (e.g., `https://cortex.example.com/api/reports/upload`)
+5. Click **Add variable**
+
+## Supported Security Scanners
+
+This action accepts reports from various security scanning tools. Common examples include:
+
+- **Trivy** - Container and filesystem vulnerability scanner
+- **Gitleaks** - Secret detection tool
+- **SARIF** - Static Analysis Results Interchange Format
+- Any tool that generates JSON or compatible report formats
+
+## Troubleshooting
+
+### Upload Failed: Authentication Error
+
+**Problem:** Getting 401 or 403 errors
+
+**Solution:**
+- Verify your API key is correct
+- Check that the secret name matches in your workflow
+- Ensure your API key hasn't expired
+
+### Upload Failed: Connection Error
+
+**Problem:** Cannot connect to endpoint
+
+**Solution:**
+- Verify the endpoint URL is correct
+- Ensure network connectivity to the Cortex platform
+
+### Upload Failed: Report File Not Found
+
+**Problem:** Report file not found at specified path
+
+**Solution:**
+- Verify the scanner actually created the report file
+- Check the `report_path` matches the scanner output location
+- Ensure the path is relative to the workspace root
+
+### Debug Mode
+
+For detailed troubleshooting, you can enable debug logging by setting the `ACTIONS_STEP_DEBUG` secret to `true` in your repository settings.
+
+## Example Workflows
+
+### Continuous Scanning
 
 ```yaml
-- name: Upload to Imed Cortex
-  id: cortex-upload
-  uses: your-org/cortex-action@v1
-  with:
-    endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
-    api_key: ${{ secrets.CORTEX_API_KEY }}
-    report_path: './scan-results.json'
+name: Continuous Security Scan
 
-- name: Check upload result
-  if: steps.cortex-upload.outputs.success == 'false'
-  run: |
-    echo "Upload failed: ${{ steps.cortex-upload.outputs.message }}"
-    echo "Status code: ${{ steps.cortex-upload.outputs.status_code }}"
-    exit 1
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Security Scan
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace \
+            aquasec/trivy:latest fs --format json \
+            --output /workspace/trivy-report.json /workspace
+
+      - name: Upload to Cortex
+        uses: cguajardo-imed/cortex-action@v1
+        with:
+          endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
+          api_key: ${{ secrets.CORTEX_API_KEY }}
+          report_path: trivy-report.json
 ```
 
-## Local Testing
+### Matrix Strategy (Multiple Scanners)
 
-### Prerequisites
+```yaml
+name: Multi-Scanner Security Analysis
 
-- Docker installed and running
-- A valid report file to upload
-- Access to Imed Cortex endpoint and API key
+on:
+  push:
+    branches: [ main ]
 
-### Configuration
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scanner:
+          - name: trivy
+            command: docker run --rm -v ${{ github.workspace }}:/workspace aquasec/trivy:latest fs --format json --output /workspace/trivy.json /workspace
+            report: trivy.json
+          - name: gitleaks
+            command: docker run --rm -v ${{ github.workspace }}:/workspace zricethezav/gitleaks:latest detect --source /workspace --report-path /workspace/gitleaks.json --report-format json || true
+            report: gitleaks.json
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-The test scripts use a `.env` file for configuration. This keeps sensitive data like API keys out of the scripts themselves.
+      - name: Run ${{ matrix.scanner.name }}
+        run: ${{ matrix.scanner.command }}
 
-1. **Copy the example environment file:**
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Edit `.env` with your values:**
-   ```bash
-   # Example .env file content
-   REPORT_PATH=/path/to/your/scan-results.json
-   ENDPOINT_URL=https://cortex.example.com/api/upload/sarif
-   API_KEY=your-actual-api-key-here
-   IMAGE_NAME=imed-cortex-action:latest
-   ```
-
-   For Windows, use Windows paths:
-   ```bash
-   REPORT_PATH=C:\path\to\your\scan-results.json
-   ```
-
-   For WSL, use WSL paths:
-   ```bash
-   REPORT_PATH=/mnt/c/path/to/your/scan-results.json
-   ```
-
-3. **Run the test script:**
-
-   **Bash (Linux/macOS/WSL):**
-   ```bash
-   ./test.sh
-   ```
-
-   **PowerShell (Windows):**
-   ```powershell
-   ./test.ps1
-   ```
-
-The scripts will:
-- ✅ Load configuration from `.env`
-- ✅ Validate all required variables are set
-- ✅ Build the Docker image if needed
-- ✅ Upload the report to Imed Cortex
-
-### Manual Testing (Without .env)
-
-If you prefer to test manually without the `.env` file:
-
-**Bash:**
-```bash
-# Build the Docker image
-docker build -t imed-cortex-action:latest .
-
-# Run the action
-docker run -v "/path/to/report.json:/github/workspace/report.json" \
-  -e REPORT_PATH="/github/workspace/report.json" \
-  -e API_KEY="your-api-key-here" \
-  -e ENDPOINT_URL="https://cortex.example.com/api/upload/sarif" \
-  imed-cortex-action:latest
-```
-
-**PowerShell:**
-```powershell
-# Build the Docker image
-docker build -t imed-cortex-action:latest .
-
-# Run the action
-docker run -v "C:\path\to\report.json:/github/workspace/report.json" `
-  -e REPORT_PATH="/github/workspace/report.json" `
-  -e API_KEY="your-api-key-here" `
-  -e ENDPOINT_URL="https://cortex.example.com/api/upload/sarif" `
-  imed-cortex-action:latest
+      - name: Upload ${{ matrix.scanner.name }} Report
+        uses: cguajardo-imed/cortex-action@v1
+        with:
+          endpoint_url: ${{ vars.CORTEX_ENDPOINT_URL }}
+          api_key: ${{ secrets.CORTEX_API_KEY }}
+          report_path: ${{ matrix.scanner.report }}
 ```
 
 ## Security Considerations
 
-- **Never commit API keys**: Always use GitHub Secrets for the `api_key` input
-- **Never commit .env file**: The `.env` file is in `.gitignore` to prevent accidental commits
-- **Use .env.example**: Share `.env.example` with placeholder values, never the actual `.env`
-- **Use environment variables**: Store the endpoint URL in GitHub Variables or Secrets
-- **Validate reports**: The action validates that the report file exists before attempting upload
-- **Secure transmission**: All data is transmitted over HTTPS to the Imed Cortex platform
-
-## Troubleshooting
-
-### Upload fails with "Report file not found"
-- Ensure the `report_path` is correct and the file exists
-- Check that your security scanner successfully created the output file
-- Verify the path is relative to the GitHub workspace
-
-### Upload fails with authentication error
-- Verify your API key is correct and not expired
-- Check that the API key has proper permissions in Imed Cortex
-- Ensure the API key secret is properly configured in your repository
-
-### Network or connection errors
-- Verify the `endpoint_url` is correct and accessible
-- Check if there are any network restrictions or firewall rules
-- Ensure the Imed Cortex platform is operational
-
-## Development
-
-### Project Structure
-
-```
-.
-├── Dockerfile              # Docker image definition
-├── entrypoint.sh          # Main script that handles upload
-├── action.yml             # GitHub Action metadata
-├── test.sh                # Bash test script
-├── test.ps1               # PowerShell test script
-└── README.md              # This file
-```
-
-### Building Locally
-
-```bash
-docker build -t imed-cortex-action:latest .
-```
-
-### Running Tests
-
-1. Configure your test environment:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your test values
-   ```
-
-2. Run the test script:
-   ```bash
-   # Bash
-   ./test.sh
-
-   # PowerShell
-   ./test.ps1
-   ```
-
-The test scripts will automatically load configuration from `.env` and validate all required values.
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-- All scripts follow POSIX sh compatibility (for `entrypoint.sh`)
-- Test scripts are updated for both Bash and PowerShell
-- Documentation is updated to reflect changes
-- Docker builds successfully without warnings
-
-## License
-
-[Your License Here]
+- **API Key Storage**: Always store API keys in GitHub Secrets, never in code
+- **Endpoint URL**: Can be stored in Variables for easier management
+- **Report Contents**: Ensure reports don't contain sensitive information
+- **Access Control**: Limit who can view workflow runs that contain security data
 
 ## Support
 
-For issues, questions, or contributions, please contact the Imed Cortex team or open an issue in this repository.
+For issues, questions, or feature requests:
+
+1. Check the [troubleshooting section](#troubleshooting) above
+2. Review existing [GitHub Issues](https://github.com/cguajardo-imed/cortex-action/issues)
+3. Create a new issue with detailed information about your problem
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Related
+
+- [cortex-uploader](https://github.com/cguajardo-imed/cortex-uploader) - The underlying Docker container
+- Docker Image: `ghcr.io/cguajardo-imed/cortex-uploader:latest`
